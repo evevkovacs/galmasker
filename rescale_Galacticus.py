@@ -233,16 +233,17 @@ def get_cKDTree(galacticus_data, zkey, opt, speed='slow', read=False, write=Fals
 
     return galacticus_tree
         
-def rescale_galaxies(sdss_data, matched_data, ref_column=0, rescale_columns=[0,1],\
+def rescale_galaxies(sdss_data, matched_data, ref_column=1, rescale_columns=[0,1],\
                      warp_colors=True, warp_columns=[2,3], warp_ref_column=3):
 
     rescale_factor = options_rescale['extract'].get(str(ref_column))(sdss_data.T[ref_column], matched_data.T[ref_column])
-    print 'Rescaling using function'.format(options_rescale['extract'].get(str(ref_column)))
+    print 'Rescaling using column {} data with {}'.format(ref_column, str(options_rescale['extract'].get(str(ref_column))))
 
     #copy dict and rescale column data with specified function
     rescaled_data = {'data':matched_data.copy()}
     for col in rescale_columns:
         rescaled_data['data'].T[col] = options_rescale['rescale'].get(str(col))(rescale_factor, matched_data.T[col])
+        print 'Rescaling column {} data with {}'.format(col, str(options_rescale['rescale'].get(str(col))))
 
     #save rescale factors and columns
     rescaled_data['rescale_factor'] = rescale_factor
@@ -256,13 +257,13 @@ def rescale_galaxies(sdss_data, matched_data, ref_column=0, rescale_columns=[0,1
         funcs=[]
         for col in warp_columns:
             if col==warp_ref_column:
-                funcs.append(np.add)
+                funcs.append('add')
                 rescaled_data['data'].T[col] = np.add(matched_data.T[col], warp_shift)
             else:
-                funcs.append(np.subtract)
+                funcs.append('subtract')
                 rescaled_data['data'].T[col] = np.subtract(matched_data.T[col], warp_shift)
 
-        print 'Warping columns {} with {}'.format(', '.join(warp_columns),', '.join(funcs))
+        print 'Warping columns {} with {}'.format(', '.join([str(w) for w in warp_columns]),', '.join(funcs))
         #save
         rescaled_data['warp_shift'] = warp_shift
         rescaled_data['warp_factor'] = warp_factor
