@@ -332,7 +332,6 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
                         sdss_data_dict[opt] = normalize_data(sdss_data_dict[opt], normalize=normalize)
 
                 normalize = get_normalize(sdss_data_dict['log'])
-                plot_ranges = get_normalize(sdss_data_dict[opt], quiet=True) #depend on whether data is normed 
 
                 if not galacticus_data_dict or opt not in galacticus_data_dict:
                     galacticus_data_dict[opt] = get_galacticus_data(galacticus, mask=mask_this, properties=galacticus_properties,\
@@ -340,6 +339,9 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
                     if options_match[opt].get('norm',False):
                         print 'Normalizing galacticus variables'
                         galacticus_data_dict[opt] = normalize_data(galacticus_data_dict[opt], normalize=normalize)
+
+                #TODO fix plot ranges
+                plot_ranges = get_normalize(sdss_data_dict[opt], quiet=True) #depend on whether data is normed 
 
                 galacticus_tree_dict[opt] = get_cKDTree(galacticus_data_dict[opt], zkey, opt, speed=speed, read=read_tree, write=write_tree)
                 
@@ -395,16 +397,16 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
         #save everything
         if write_pkl or save_pkl:
             for key in results:
-                if save_pkl:
-                    if 'sdss' in key or 'galacticus' in key:
-                        fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey+'.pkl']))
+                if save_pkl and ('sdss' in key or 'galacticus' in key):
+                    fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey+'.pkl']))
+                    pickle.dump(results[key], open(fname, 'wb'))
+                    print 'Saving pkl file {}'.format(fname)
+                elif write_pkl and  'rescaled' in key:
+                    fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, rescaled_label, 'nn', str(nn)+'.pkl']))
                     pickle.dump(results[key], open(fname, 'wb'))
                     print 'Saving pkl file {}'.format(fname)
                 elif write_pkl:
-                    if 'rescaled' in key:
-                        fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, rescaled_label, 'nn', str(nn)+'.pkl']))
-                    else:
-                        fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, 'nn', str(nn)+'.pkl']))
+                    fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, 'nn', str(nn)+'.pkl']))
                     pickle.dump(results[key], open(fname, 'wb'))
                     print 'Saving pkl file {}'.format(fname)
 
