@@ -325,7 +325,7 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
             for opt in sorted(options_match.keys()): #'log' before 'norm'
                 if not sdss_data_dict:
                     sdss_data_dict[opt] = get_sdss_data(sdssfile=sdss_info[zkey].get('file',''), properties=sdss_properties,\
-                                                    logm=options_match[opt].get('logm',True), read_pkl=read_pkl, pklid=str(zkey), opt=opt)
+                                                    logm=options_match[opt].get('logm',True))
                     #normalize data
                     if options_match[opt].get('norm',False):
                         print 'Normalizing sdss variables'
