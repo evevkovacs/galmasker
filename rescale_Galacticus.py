@@ -336,7 +336,7 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
 
                 if not galacticus_data_dict:
                     galacticus_data_dict[opt] = get_galacticus_data(galacticus, mask=mask_this, properties=galacticus_properties,\
-                                                                logm=options_match[opt].get('logm',True), read_pkl=read_pkl, pklid=str(zkey), opt=opt)
+                                                                logm=options_match[opt].get('logm',True))
                     if options_match[opt].get('norm',False):
                         print 'Normalizing galacticus variables'
                         galacticus_data_dict[opt] = normalize_data(galacticus_data_dict[opt], normalize=normalize)
