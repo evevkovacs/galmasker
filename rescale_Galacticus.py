@@ -334,7 +334,7 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
                 normalize = get_normalize(sdss_data_dict['log'])
                 plot_ranges = get_normalize(sdss_data_dict[opt], quiet=True) #depend on whether data is normed 
 
-                if not galacticus_data_dict:
+                if not galacticus_data_dict or opt not in galacticus_data_dict:
                     galacticus_data_dict[opt] = get_galacticus_data(galacticus, mask=mask_this, properties=galacticus_properties,\
                                                                 logm=options_match[opt].get('logm',True))
                     if options_match[opt].get('norm',False):
