@@ -294,7 +294,7 @@ def get_distances(reference_data, matched_data, properties=generic_properties):
 def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfile=mask_DC2.yamlfile,\
              sdss_properties=sdss_properties, galacticus_properties=galacticus_properties, options=options_match,\
              rescale_column=0, fast=True, warp_colors=True, warp_columns=[2,3], warp_ref_column=3,\
-             read_pkl=True, write_pkl=False, read_tree=False, write_tree=False):
+             read_pkl=True, write_pkl=False, save_pkl=False, read_tree=False, write_tree=False):
     
     if not read_pkl:
         galacticus, mask_bad = get_galacticus(catfile=catfile, yamlfile=yamlfile)
@@ -323,15 +323,15 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
         if read_pkl or any(mask_this):
         #loop over matching options:
             for opt in sorted(options_match.keys()): #'log' before 'norm'
-                if not sdss_data_dict:
+                if not sdss_data_dict or opt not in sdss_data_dict:
                     sdss_data_dict[opt] = get_sdss_data(sdssfile=sdss_info[zkey].get('file',''), properties=sdss_properties,\
                                                     logm=options_match[opt].get('logm',True))
                     #normalize data
                     if options_match[opt].get('norm',False):
                         print 'Normalizing sdss variables'
                         sdss_data_dict[opt] = normalize_data(sdss_data_dict[opt], normalize=normalize)
-                normalize = get_normalize(sdss_data_dict['log'])
 
+                normalize = get_normalize(sdss_data_dict['log'])
                 plot_ranges = get_normalize(sdss_data_dict[opt], quiet=True) #depend on whether data is normed 
 
                 if not galacticus_data_dict:
@@ -391,17 +391,23 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
         results['matched'] = matched_data_dict
         results['rescaled'] = rescaled_data_dict
         results['matched_stats'] = matched_stats_dict
+
         #save everything
-        if write_pkl:
+        if write_pkl or save_pkl:
             for key in results:
-                if 'sdss' in key or 'galacticus' in key:
-                    fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey+'.pkl']))
-                elif 'rescaled' in key:
-                    fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, rescaled_label, 'nn', str(nn)+'.pkl']))
-                else:
-                    fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, 'nn', str(nn)+'.pkl']))
-                pickle.dump(results[key], open(fname, 'wb'))
-        
+                if save_pkl:
+                    if 'sdss' in key or 'galacticus' in key:
+                        fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey+'.pkl']))
+                    pickle.dump(results[key], open(fname, 'wb'))
+                    print 'Saving pkl file {}'.format(fname)
+                elif write_pkl:
+                    if 'rescaled' in key:
+                        fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, rescaled_label, 'nn', str(nn)+'.pkl']))
+                    else:
+                        fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, 'nn', str(nn)+'.pkl']))
+                    pickle.dump(results[key], open(fname, 'wb'))
+                    print 'Saving pkl file {}'.format(fname)
+
         return results
 
 def plot_stats(stats_data, nrows=2, ncolumns=2, pdfid='', usetex=False, dist_cut=10.):
