@@ -6,6 +6,7 @@ import numpy as np
 import pickle
 import json
 import time
+import copy
 try:
     from itertools import zip_longest
 except ImportError:
@@ -37,20 +38,20 @@ galaxyProperties = 'galaxyProperties'
 galaxyID = 'galaxyID'
 
 sdss_properties = ['obs_sm', 'rmag', 'sdss_petrosian_gr', 'sdss_petrosian_ri']
+galacticus_properties_nodust = [['totalMassStellar'],
+                                ['SDSS_filters/totalLuminositiesStellar:SDSS_r:rest'],
+                                ['SDSS_filters/totalLuminositiesStellar:SDSS_g:rest',
+                                 'SDSS_filters/totalLuminositiesStellar:SDSS_r:rest'],
+                                ['SDSS_filters/totalLuminositiesStellar:SDSS_r:rest',
+                                 'SDSS_filters/totalLuminositiesStellar:SDSS_i:rest'],
+                               ]
 galacticus_properties = [['totalMassStellar'],
-                         ['SDSS_filters/totalLuminositiesStellar:SDSS_r:rest'],
-                         ['SDSS_filters/totalLuminositiesStellar:SDSS_g:rest',
-                          'SDSS_filters/totalLuminositiesStellar:SDSS_r:rest'],
-                         ['SDSS_filters/totalLuminositiesStellar:SDSS_r:rest',
-                          'SDSS_filters/totalLuminositiesStellar:SDSS_i:rest'],
+                         ['SDSS_filters/totalLuminositiesStellar:SDSS_r:rest:dustAtlas'],
+                         ['SDSS_filters/totalLuminositiesStellar:SDSS_g:rest:dustAtlas', 
+                          'SDSS_filters/totalLuminositiesStellar:SDSS_r:rest:dustAtlas'],
+                         ['SDSS_filters/totalLuminositiesStellar:SDSS_r:rest:dustAtlas',
+                          'SDSS_filters/totalLuminositiesStellar:SDSS_i:rest:dustAtlas'],
                         ]
-galacticus_properties_dust = [['totalMassStellar'],
-                              ['SDSS_filters/totalLuminositiesStellar:SDSS_r:rest:dustAtlas'],
-                              ['SDSS_filters/totalLuminositiesStellar:SDSS_g:rest:dustAtlas', 
-                               'SDSS_filters/totalLuminositiesStellar:SDSS_r:rest:dustAtlas'],
-                              ['SDSS_filters/totalLuminositiesStellar:SDSS_r:rest:dustAtlas',
-                               'SDSS_filters/totalLuminositiesStellar:SDSS_i:rest:dustAtlas'],
-                             ]
 
 generic_properties = OrderedDict((
                                  ('M*', {'label':r'$M_*$', 'data_column': 0, 'bins':60, 'label_log':'$\log_{10}M_*$'}),
@@ -88,11 +89,6 @@ def rescale_mag(scale_factor, mag_match):
     mag_rescaled = -2.5*np.log10(flux_rescaled)
     return mag_rescaled
 
-def rescale_color(scale_factor, color_match):
-
-    color_rescaled = color_match
-    return color_rescaled
-
 def extract_Mstar_scale(Mstar_ref, Mstar_match, log_values=True):
     
     if log_values:
@@ -101,21 +97,12 @@ def extract_Mstar_scale(Mstar_ref, Mstar_match, log_values=True):
 
 def extract_mag_scale(mag_ref, mag_match):
     
-    return np.power(10.,-0.4*(mag_ref - mag_match))
+    return np.power(10., -0.4*(mag_ref - mag_match))
 
-options_rescale = {'rescale':{'0':rescale_Mstar, '1': rescale_mag, '2': rescale_color, '3': rescale_color},
-                   'extract':{'0':extract_Mstar_scale, '1':extract_mag_scale},                         
+options_rescale = {'rescale':{'0':rescale_Mstar, '1': rescale_mag},
+                   'extract':{'0':extract_Mstar_scale, '1':extract_mag_scale}
                   }
-"""
-options_rescale = OrderedDict((
-                              ('0', rescale_Mstar),
-                              ('1', rescale_mag),
-                             ))
-options_extract = OrderedDict((
-                              ('0', extract_Mstar_scale),
-                              ('1', extract_mag_scale),
-                             ))
-"""
+
 #plotting
 figx_l = 15
 figy_l = 11
@@ -191,24 +178,27 @@ def get_galacticus_data(galacticus, properties=galacticus_properties, mask=None,
                       
     return stacked_array
 
+def get_normalize(galaxy_data, quiet=False):
+    normalize={}
+    #compute and save remormalizations:
+    for n, column_data in enumerate(galaxy_data.T):
+        normalize[str(n)] = {'min':np.min(column_data), 'max':np.max(column_data)}
+        
+    if not quiet:
+        print 'Setting up dict for normalizations\n:', json.dumps(normalize, indent=2)
+    return normalize
+
+
 def normalize_data(galaxy_data, normalize={}):
 
     data = OrderedDict()
-    if not normalize:
-        #compute and save remormalizations:
+    if normalize: 
         for n, column_data in enumerate(galaxy_data.T):
-            normalize[str(n)] = {'min':np.min(column_data), 'max':np.max(column_data)}
-
-        print 'Setting up dict for normalizations\n:', json.dumps(normalize, indent=2)
- 
-    #now renormalize data
-    for n, column_data in enumerate(galaxy_data.T):
-        data[str(n)] = (column_data - normalize[str(n)].get('min'))/(normalize[str(n)].get('max') - normalize[str(n)].get('min'))
-        print 'Normalizing column {} data to range {} - {}'.format(n, np.min(data[str(n)]), np.max(data[str(n)]))
+            data[str(n)] = (column_data - normalize[str(n)].get('min'))/(normalize[str(n)].get('max') - normalize[str(n)].get('min'))
+            print 'Normalizing column {} data to range {} - {}'.format(n, np.min(data[str(n)]), np.max(data[str(n)]))
 
     stacked_array = np.vstack((data[key] for key in data.keys())).T
-                      
-    return stacked_array, normalize
+    return stacked_array
 
 def unnormalize_data(galaxy_data, normalize):
 
@@ -216,19 +206,18 @@ def unnormalize_data(galaxy_data, normalize):
     if normalize:
         for n, column_data in enumerate(galaxy_data.T):
             data[str(n)] = normalize[str(n)].get('min') + column_data*(normalize[str(n)].get('max') - normalize[str(n)].get('min'))
-            print 'Normalizing column {} data to range {} - {}'.format(n, np.min(data[str(n)]), np.max(data[str(n)]))
+            print 'Un-normalizing column {} data to range {} - {}'.format(n, np.min(data[str(n)]), np.max(data[str(n)]))
 
     stacked_array = np.vstack((data[key] for key in data.keys())).T
                       
     return stacked_array
 
-def get_cKDTree(galacticus_data, zkey, opt, fast=True):
+def get_cKDTree(galacticus_data, zkey, opt, speed='slow', read=False, write=False):
 
-    balanced_tree = not fast
-    compact_nodes = not fast
-    speed = 'fast' if fast else 'slow'
-    fname = os.path.join(pkldir, 'galacticus_tree_{}_{}_{}.pkl'.format(zkey, opt, speed))
-    if os.path.exists(fname):
+    balanced_tree = speed=='slow'
+    compact_nodes = speed=='slow'
+    fname = os.path.join(pkldir, '{}_build'.format(speed), 'galacticus_tree_{}_{}_{}.pkl'.format(zkey, opt, speed))
+    if read and os.path.exists(fname):
         t0 = time.time()
         galacticus_tree = pickle.load(open(fname, 'rb'))
         t1 = time.time()
@@ -237,30 +226,51 @@ def get_cKDTree(galacticus_data, zkey, opt, fast=True):
         t0 = time.time()
         galacticus_tree = cKDTree(galacticus_data, balanced_tree=balanced_tree, compact_nodes=compact_nodes)
         t1 = time.time()
-        print 'Tree build time = {}\n Saving pkl file {}'.format(t1-t0, fname)
-        pickle.dump(galacticus_tree, open(fname, 'wb'))
-        
+        print 'Tree build time = {}'.format(t1-t0)
+        if write:
+            pickle.dump(galacticus_tree, open(fname, 'wb'))
+            print 'Saving pkl file {}'.format(fname)
+
     return galacticus_tree
         
-def rescale_galaxies(sdss_data, matched_data, ref_column=0, rescale_columns=[0,1]):
+def rescale_galaxies(sdss_data, matched_data, ref_column=0, rescale_columns=[0,1],\
+                     warp_colors=True, warp_columns=[2,3], warp_ref_column=3):
 
-    rescaled_data ={}
     rescale_factor = options_rescale['extract'].get(str(ref_column))(sdss_data.T[ref_column], matched_data.T[ref_column])
-    
-    #for row in  matched_data.T:
-    rescaled_data['data'] = matched_data 
-    for col, func in rescale_columns, :
+    print 'Rescaling using function'.format(options_rescale['extract'].get(str(ref_column)))
+
+    #copy dict and rescale column data with specified function
+    rescaled_data = {'data':matched_data.copy()}
+    for col in rescale_columns:
         rescaled_data['data'].T[col] = options_rescale['rescale'].get(str(col))(rescale_factor, matched_data.T[col])
-
-    #TODO add color shift option
-
-    #recompute distances
-    distances = get_distances(sdss_data, rescaled_data['data'])
 
     #save rescale factors and columns
     rescaled_data['rescale_factor'] = rescale_factor
     rescaled_data['rescale_columns'] = rescale_columns
     rescaled_data['ref_column'] = ref_column
+
+    #color shift option
+    if warp_colors:
+        warp_shift = sdss_data.T[warp_ref_column] - matched_data.T[warp_ref_column]
+        warp_factor = np.power(10., 0.4*warp_shift) if warp_ref_column==3 else np.power(10., -0.4*warp_shift)
+        funcs=[]
+        for col in warp_columns:
+            if col==warp_ref_column:
+                funcs.append(np.add)
+                rescaled_data['data'].T[col] = np.add(matched_data.T[col], warp_shift)
+            else:
+                funcs.append(np.subtract)
+                rescaled_data['data'].T[col] = np.subtract(matched_data.T[col], warp_shift)
+
+        print 'Warping columns {} with {}'.format(', '.join(warp_columns),', '.join(funcs))
+        #save
+        rescaled_data['warp_shift'] = warp_shift
+        rescaled_data['warp_factor'] = warp_factor
+        rescaled_data['warp_ref_column'] = warp_ref_column
+        rescaled_data['warp_columns'] = warp_columns
+
+    #recompute distances
+    distances = get_distances(sdss_data, rescaled_data['data'])
 
     return rescaled_data, distances
 
@@ -282,37 +292,55 @@ def get_distances(reference_data, matched_data, properties=generic_properties):
 
 def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfile=mask_DC2.yamlfile,\
              sdss_properties=sdss_properties, galacticus_properties=galacticus_properties, options=options_match,\
-             rescale_column=0, fast=False):
-
-    galacticus, mask_bad = get_galacticus(catfile=catfile, yamlfile=yamlfile)
-
-    sdss_data_dict = {}
-    galacticus_data_dict = {}
+             rescale_column=0, fast=True, warp_colors=True, warp_columns=[2,3], warp_ref_column=3,\
+             read_pkl=True, write_pkl=False, read_tree=False, write_tree=False):
+    
+    if not read_pkl:
+        galacticus, mask_bad = get_galacticus(catfile=catfile, yamlfile=yamlfile)
+        sdss_data_dict = {}
+        galacticus_data_dict = {}
+    
     galacticus_tree_dict = {}
     matched_data_dict = {}
     rescaled_data_dict = {}
     matched_stats_dict = {}
 
     rescaled_label = 'rescale_'+str([d for d in generic_properties if generic_properties[d]['data_column']==rescale_column][0])
+    speed = 'fast' if fast else 'slow'
+    warp_label = '_warp_'+str([d for d in generic_properties if generic_properties[d]['data_column']==warp_ref_column][0]) if warp_colors else ''
 
     for zkey in zkeys:
-      zmask = get_zmask(galacticus, steps=sdss_info[zkey].get('steps',[]))
-      mask_this = mask_bad & zmask
-      if any(mask_this):
-        print 'Using {} Galacticus galaxies for match'.format(np.sum(mask_this))
+        if not read_pkl:
+            zmask = get_zmask(galacticus, steps=sdss_info[zkey].get('steps',[]))
+            mask_this = mask_bad & zmask
+            print 'Using {} Galacticus galaxies for match'.format(np.sum(mask_this))
+        else:
+            print 'Reading sdss and galacticus data from pklfiles xxx_data_dict_{}.pkl'.format(str(zkey))
+            sdss_data_dict = pickle.load(open(os.path.join(pkldir, 'sdss_data_dict_{}.pkl'.format(str(zkey))),'rb'))
+            galacticus_data_dict = pickle.load(open(os.path.join(pkldir, 'galacticus_data_dict_{}.pkl'.format(str(zkey))),'rb'))
+                                               
+        if read_pkl or any(mask_this):
         #loop over matching options:
-        for opt in sorted(options_match.keys()): #'log' before 'norm'
-            sdss_data_dict[opt] = get_sdss_data(sdssfile=sdss_info[zkey].get('file',''), properties=sdss_properties, logm=options_match[opt].get('logm',True))
-            if options_match[opt].get('norm',False):
-                print 'Normalizing sdss variables'
-                sdss_data_dict[opt], normalize = normalize_data(sdss_data_dict[opt], normalize={})
- 
-            if any(mask_this):
-                galacticus_data_dict[opt] = get_galacticus_data(galacticus, mask=mask_this, properties=galacticus_properties, logm=options_match[opt].get('logm',True))
-                if options_match[opt].get('norm',False):
-                    print 'Normalizing galacticus variables'
-                    galacticus_data_dict[opt], check_norm = normalize_data(galacticus_data_dict[opt], normalize=normalize)
-                galacticus_tree_dict[opt] = get_cKDTree(galacticus_data_dict[opt], zkey, opt, fast=fast)
+            for opt in sorted(options_match.keys()): #'log' before 'norm'
+                if not sdss_data_dict:
+                    sdss_data_dict[opt] = get_sdss_data(sdssfile=sdss_info[zkey].get('file',''), properties=sdss_properties,\
+                                                    logm=options_match[opt].get('logm',True), read_pkl=read_pkl, pklid=str(zkey), opt=opt)
+                    #normalize data
+                    if options_match[opt].get('norm',False):
+                        print 'Normalizing sdss variables'
+                        sdss_data_dict[opt] = normalize_data(sdss_data_dict[opt], normalize=normalize)
+                normalize = get_normalize(sdss_data_dict['log'])
+
+                plot_ranges = get_normalize(sdss_data_dict[opt], quiet=True) #depend on whether data is normed 
+
+                if not galacticus_data_dict:
+                    galacticus_data_dict[opt] = get_galacticus_data(galacticus, mask=mask_this, properties=galacticus_properties,\
+                                                                logm=options_match[opt].get('logm',True), read_pkl=read_pkl, pklid=str(zkey), opt=opt)
+                    if options_match[opt].get('norm',False):
+                        print 'Normalizing galacticus variables'
+                        galacticus_data_dict[opt] = normalize_data(galacticus_data_dict[opt], normalize=normalize)
+
+                galacticus_tree_dict[opt] = get_cKDTree(galacticus_data_dict[opt], zkey, opt, speed=speed, read=read_tree, write=write_tree)
                 
                 t0 = time.time()
                 nn_distances, nn_indices = galacticus_tree_dict[opt].query(sdss_data_dict[opt], k=nn, n_jobs=16)
@@ -328,26 +356,32 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
                 distances = get_distances(sdss_data_dict[opt], matched_data_dict[opt]['data']) 
                 assert np.allclose(nn_distances, distances.get('Total')), "Distances don't match"
 
-                matched_stats_dict[opt] = {'unique': nn_unique, 'counts': nn_counts, 'distances_raw': distances}
+                matched_stats_dict[opt] = {'unique': nn_unique, 'counts': nn_counts, 'distances_raw': distances, 'normalize':normalize}
                 if options_match[opt].get('norm',False):
+                    #rescale data if normed above
                     print 'Unnormalizing matched variables'
                     matched_data_dict[opt]['data'] = unnormalize_data(matched_data_dict[opt]['data'], normalize)
-                    matched_data_dict[opt]['normalize'] = normalize
                     matched_stats_dict[opt]['distances_unnormed'] = get_distances(sdss_data_dict['log'], matched_data_dict[opt]['data'])
-                    rescaled_data_dict[opt], rescaled_distances = rescale_galaxies(sdss_data_dict['log'], matched_data_dict[opt]['data'],\
-                                                                  ref_column=rescale_column)
+                    sdss_key = 'log'
+                    plot_ranges = normalize #reset plot_ranges
                 else:
-                    rescaled_data_dict[opt], rescaled_distances = rescale_galaxies(sdss_data_dict[opt], matched_data_dict[opt]['data'],\
-                                                                  ref_column=rescale_column) 
+                    sdss_key = opt
+                rescaled_data_dict[opt], rescaled_distances = rescale_galaxies(sdss_data_dict[sdss_key], matched_data_dict[opt]['data'],\
+                                                              ref_column=rescale_column, warp_colors=warp_colors,\
+                                                              warp_ref_column=warp_ref_column, warp_columns=warp_columns)
                 
                 matched_stats_dict[opt]['distances_rescaled'] = rescaled_distances
                 
                 #make_plots
-                plot_distributions(sdss_data_dict[opt], title='UM+SDSS z={} {} scales'.format(str(zkey), opt), pdfid='_'.join(['sdss', zkey, opt]))
-                plot_distributions(galacticus_data_dict[opt], title='Galacticus z={} {} scales'.format(str(zkey), opt), pdfid='_'.join(['galacticus', zkey, opt]))
-                plot_distributions(matched_data_dict[opt]['data'], title='{} match nn={}'.format(opt, str(nn)), pdfid='_'.join(['matched', zkey, 'nn', str(nn), opt]))
-                plot_distributions(rescaled_data_dict[opt]['data'], title='{} match nn={} {}'.format(opt, str(nn), rescaled_label), pdfid='_'.join([rescaled_label, zkey, 'nn', str(nn), opt]))
-                plot_stats(matched_stats_dict, pdfid='_'.join([rescaled_label, zkey, 'nn', str(nn)]))
+                plot_distributions(sdss_data_dict[opt], title='UM+SDSS z={} {}'.format(str(zkey), opt),\
+                                   pdfid='_'.join(['sdss', zkey, opt]), ranges=plot_ranges)
+                plot_distributions(galacticus_data_dict[opt], title='Galacticus z={} {} scales'.format(str(zkey), opt),\
+                                   pdfid='_'.join(['galacticus', zkey, opt]), ranges=plot_ranges)
+                plot_distributions(matched_data_dict[opt]['data'], title='{} {} match nn={}'.format(speed, opt, str(nn)),\
+                                   pdfid='_'.join(['matched', zkey, 'nn', str(nn), opt, speed]), ranges=plot_ranges)
+                plot_distributions(rescaled_data_dict[opt]['data'], title='{} {} match nn={} {}'.format(speed, opt, str(nn), rescaled_label+warp_label),\
+                                   pdfid='_'.join([rescaled_label+warp_label, zkey, 'nn', str(nn), opt, speed]), ranges=plot_ranges)
+                plot_stats(matched_stats_dict, pdfid='_'.join([rescaled_label+warp_label, zkey, 'nn', str(nn), speed]))
 
 
         results = {}
@@ -357,18 +391,19 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
         results['rescaled'] = rescaled_data_dict
         results['matched_stats'] = matched_stats_dict
         #save everything
-        for key in results:
-            if 'sdss' in key or 'galacticus' in key:
-                fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey+'.pkl']))
-            elif 'rescaled' in key:
-                fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, rescaled_label, 'nn', str(nn)+'.pkl']))
-            else:
-                fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, 'nn', str(nn)+'.pkl']))
-            pickle.dump(results[key], open(fname, 'wb'))
+        if write_pkl:
+            for key in results:
+                if 'sdss' in key or 'galacticus' in key:
+                    fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey+'.pkl']))
+                elif 'rescaled' in key:
+                    fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, rescaled_label, 'nn', str(nn)+'.pkl']))
+                else:
+                    fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, 'nn', str(nn)+'.pkl']))
+                pickle.dump(results[key], open(fname, 'wb'))
         
         return results
 
-def plot_stats(stats_data, nrows=2, ncolumns=2, pdfid='', usetex=False, ):
+def plot_stats(stats_data, nrows=2, ncolumns=2, pdfid='', usetex=False, dist_cut=10.):
 
     rc('text', usetex=usetex)
     for key in stats_data:
@@ -391,17 +426,19 @@ def plot_stats(stats_data, nrows=2, ncolumns=2, pdfid='', usetex=False, ):
             else:
                 distances = stats_data[key]['distances_'+dkey]
                 for dist in distances:
-                    mask = np.abs(distances.get(dist)) < 10.
-                    if np.sum(mask) < len(distances.get(dist)):
-                        print 'Ignoring {} outliers out of total {}'.format(np.sum(mask), len(distances.get(dist)))
-                        bins = 250
+                    mask = np.abs(distances.get(dist)) < dist_cut
+                    if np.sum(mask):
+                        if np.sum(mask) < len(distances.get(dist)):
+                            print 'Ignoring {} outliers out of total {}'.format(np.sum(mask), len(distances.get(dist)))
+                            bins = 250
+                        else:
+                            bins = 50
+                        ax_this.hist(distances.get(dist)[mask], bins=bins, color=colors.next(), histtype='step', label=dist)
+                        ax_this.set_title(key+'-match '+dkey)
+                        ax_this.set_yscale('log')
+                        ax_this.legend(loc='best', numpoints=1)
                     else:
-                        bins = 50
-                    ax_this.hist(distances.get(dist)[mask], bins=bins, color=colors.next(), histtype='step', label=dist)
-                    ax_this.set_title(key+'-match '+dkey)
-                    ax_this.set_yscale('log')
-                    ax_this.legend(loc='best', numpoints=1)
-
+                        print "No distances < {}".format(dist_cut)
 
         pdffile = os.path.join(pdfdir, '_'.join(['matched_stats',pdfid,key+'.pdf']))
         plt.savefig(pdffile)
@@ -409,7 +446,7 @@ def plot_stats(stats_data, nrows=2, ncolumns=2, pdfid='', usetex=False, ):
         plt.close(fig)
 
 
-def plot_distributions(galaxy_data, properties=generic_properties, ncolumns=3, pdfid='', cmap='plasma', title=title, usetex=False):
+def plot_distributions(galaxy_data, properties=generic_properties, ncolumns=3, pdfid='', cmap='plasma', title=title, usetex=False, ranges={}):
                       
     rc('text', usetex=usetex)
     #plot all combinations
@@ -424,14 +461,23 @@ def plot_distributions(galaxy_data, properties=generic_properties, ncolumns=3, p
         ydata = galaxy_data.T[properties[keys[-1]]['data_column']]
         ax_this.set_xscale(properties[keys[0]].get('scale', 'linear'))
         ax_this.set_yscale(properties[keys[-1]].get('scale', 'linear'))
-        h = ax_this.hist2d(xdata, ydata, bins=(properties[keys[0]].get('bins', 40), properties[keys[-1]].get('bins', 40)), norm=LogNorm())
-
-        #ax_this.set_xlabel(properties[keys[0]].get('label',keys[0]))
-        #ax_this.set_ylabel(properties[keys[-1]].get('label',keys[-1]))
-        ax_this.set_xlabel(keys[0])
-        ax_this.set_ylabel(keys[-1])
-        plt.colorbar(h[3], ax=ax_this)
-        ax_this.set_title(title)
+        if len(xdata)>0 and len(ydata)>0:
+            h = ax_this.hist2d(xdata, ydata, bins=(properties[keys[0]].get('bins', 40), properties[keys[-1]].get('bins', 40)), norm=LogNorm())
+            if usetex:
+                ax_this.set_xlabel(properties[keys[0]].get('label',keys[0]))
+                ax_this.set_ylabel(properties[keys[-1]].get('label',keys[-1]))
+            else:
+                ax_this.set_xlabel(keys[0])
+                ax_this.set_ylabel(keys[-1])
+            if ranges:
+                ax_this.set_xlim(xmin=ranges.get(str(properties[keys[0]]['data_column'])).get('min'),\
+                             xmax=ranges.get(str(properties[keys[0]]['data_column'])).get('max'))
+                ax_this.set_ylim(ymin=ranges.get(str(properties[keys[-1]]['data_column'])).get('min'),\
+                             ymax=ranges.get(str(properties[keys[-1]]['data_column'])).get('max')) 
+            plt.colorbar(h[3], ax=ax_this)
+            ax_this.set_title(title)
+        else:
+            print 'Nothing to plot'
 
     pdffile = os.path.join(pdfdir, '_'.join(['mstar_color_mag', pdfid+'.pdf']))
     plt.savefig(pdffile)
