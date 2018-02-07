@@ -29,8 +29,8 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 #my code
 import mask_DC2
 
-catfile = '/cosmo/homes/dkorytov/proj/protoDC2/output/ANL_box_v2.1.3_2_mod.hdf5'
-catfile_nocut = '/cosmo/homes/dkorytov/proj/protoDC2/output/ANL_box_v2.1.3_nocut_mod.hdf5'
+catfile_cut = '/cosmo/homes/dkorytov/proj/protoDC2/output/ANL_box_v2.1.3_2_mod.hdf5'
+catfile = '/cosmo/homes/dkorytov/proj/protoDC2/output/ANL_box_v2.1.3_nocut_mod.hdf5'
 pdfdir = '../pdffiles'
 pkldir = '../pklfiles'
 
