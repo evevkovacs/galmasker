@@ -22,6 +22,14 @@ func_checks = OrderedDict((
 
 value_checks = ['min', 'max']
 
+def flux_to_mag(flux):
+    mag = -2.5*np.log10(flux)
+    return mag
+
+derived_quantities = OrderedDict((
+        ('flux_to_mag', flux_to_mag),
+    ))
+
 def read_selections(yamlfile=yamlfile):
     
     with open(yamlfile) as f:
@@ -54,21 +62,24 @@ def mask_cat(catalog, selections={}):
         key = qdict.get('label','_'.join(qdict['quantities']))
         #check for quantities and weights
         for n, (q, w) in enumerate(zip_longest(qdict['quantities'], qdict.get('weights',[None]))):
+            q_this = catalog[galaxyProperties][q].value
+            #check for derived quantities
+            if qdict.get('derived','') in derived_quantities.keys():
+                print 'Deriving {} from {}'.format(qdict.get('derived'), q)
+                q_this = derived_quantities[qdict.get('derived')](q_this)
             if w:
-                w_this = catalog[galaxyProperties][w] if type(w)==str else w 
-                q_this = np.multiply(w_this, catalog[galaxyProperties][q])
-            else:
-                q_this = catalog[galaxyProperties][q]
+                w_this = catalog[galaxyProperties][w].value if type(w)==str else w 
+                q_this = np.multiply(w_this, q_this)
             if n==0:
                 catalog_data[key] = q_this
-                wsum_this = catalog[galaxyProperties][w] if w and type(w)==str else np.zeros(len(q_this))
+                wsum_this = w_this if w and type(w)==str else np.zeros(len(q_this))
             else: 
                 if w and type(w)==str:
-                    wsum_this = np.add(wsum_this, catalog[galaxyProperties][w])
+                    wsum_this = np.add(wsum_this, w_this)
                 #implement just sum for now
                 if 'sum' in qdict.get('function',''):
                     catalog_data[key] += q_this
-                    
+
         #normalize if needed
         if any(wsum_this):
             catalog_data[key] = catalog_data[key]/wsum_this
@@ -91,7 +102,8 @@ def mask_cat(catalog, selections={}):
             if qdict.get(c,None) is not None: #(watch out for zeros!)
                 #isclose
                 if  c=='isclose':
-                    mask_notok = func(catalog_data[key], qdict[c])
+                    #mask_notok = func(catalog_data[key], np.array([qdict[c]]*len(catalog_data[key]))) #create array of values, single value misses cases
+                    mask_notok = func(catalog_data[key], qdict[c])  #use scalar value
                 print "Rejecting {} values failing {} cut = {} (fraction = {:.4g})".format(np.sum(mask_notok), c, qdict.get(c), float(np.sum(mask_notok))/mask_len)    
                 mask_ok &= ~mask_notok
 

@@ -61,14 +61,14 @@ generic_properties = OrderedDict((
                                 ))
 
 sdss_info = {'0.0':{
-                   'file':'../../galsampler/logsm_9p5_testing_catalog_for_dtk_with_fake_sdss.hdf5',
+                   'file':'../logsm_9p5_testing_catalog_for_dtk_with_fake_sdss.hdf5',
                    'steps':[499]},
             '0.11':{
-                   'file':'../../galsampler/logsm_9p5_testing_catalog_for_dtk_with_fake_sdss.hdf5',
+                   'file':'../logsm_9p5_testing_catalog_for_dtk_with_fake_sdss.hdf5',
                    #'steps':[464, 453, 442, 432]},
                    'steps':[453]},
             '0.25':{
-                   'file':'../../galsampler/logsm_9p5_testing_catalog_for_dtk_with_fake_sdss.hdf5',
+                   'file':'../logsm_9p5_testing_catalog_for_dtk_with_fake_sdss.hdf5',
                    #'steps':[421, 411, 401, 392]},
                    'steps':[401]},
             }
@@ -332,6 +332,7 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
                         sdss_data_dict[opt] = normalize_data(sdss_data_dict[opt], normalize=normalize)
 
                 normalize = get_normalize(sdss_data_dict['log'])
+                plot_ranges = get_normalize(sdss_data_dict[opt], quiet=True) #depend on whether data is normed 
 
                 if not galacticus_data_dict or opt not in galacticus_data_dict:
                     galacticus_data_dict[opt] = get_galacticus_data(galacticus, mask=mask_this, properties=galacticus_properties,\
@@ -339,9 +340,6 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
                     if options_match[opt].get('norm',False):
                         print 'Normalizing galacticus variables'
                         galacticus_data_dict[opt] = normalize_data(galacticus_data_dict[opt], normalize=normalize)
-
-                #TODO fix plot ranges
-                plot_ranges = get_normalize(sdss_data_dict[opt], quiet=True) #depend on whether data is normed 
 
                 galacticus_tree_dict[opt] = get_cKDTree(galacticus_data_dict[opt], zkey, opt, speed=speed, read=read_tree, write=write_tree)
                 
@@ -379,7 +377,7 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
                 plot_distributions(sdss_data_dict[opt], title='UM+SDSS z={} {}'.format(str(zkey), opt),\
                                    pdfid='_'.join(['sdss', zkey, opt]), ranges=plot_ranges)
                 plot_distributions(galacticus_data_dict[opt], title='Galacticus z={} {} scales'.format(str(zkey), opt),\
-                                   pdfid='_'.join(['galacticus', zkey, opt]), ranges=plot_ranges)
+                                   pdfid='_'.join(['galacticus', zkey, opt])) #plot full range of Galacticus data
                 plot_distributions(matched_data_dict[opt]['data'], title='{} {} match nn={}'.format(speed, opt, str(nn)),\
                                    pdfid='_'.join(['matched', zkey, 'nn', str(nn), opt, speed]), ranges=plot_ranges)
                 plot_distributions(rescaled_data_dict[opt]['data'], title='{} {} match nn={} {}'.format(speed, opt, str(nn), rescaled_label+warp_label),\
@@ -399,16 +397,14 @@ def make_cat(zkeys=['0.11'], nn=1, sdss_info=sdss_info, catfile=catfile, yamlfil
             for key in results:
                 if save_pkl and ('sdss' in key or 'galacticus' in key):
                     fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey+'.pkl']))
-                    pickle.dump(results[key], open(fname, 'wb'))
-                    print 'Saving pkl file {}'.format(fname)
-                elif write_pkl and  'rescaled' in key:
+                elif write_pkl and 'rescaled' in key:
                     fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, rescaled_label, 'nn', str(nn)+'.pkl']))
-                    pickle.dump(results[key], open(fname, 'wb'))
-                    print 'Saving pkl file {}'.format(fname)
                 elif write_pkl:
                     fname = os.path.join(pkldir, '_'.join([key, 'data_dict', zkey, 'nn', str(nn)+'.pkl']))
-                    pickle.dump(results[key], open(fname, 'wb'))
-                    print 'Saving pkl file {}'.format(fname)
+                else:
+                    continue
+                pickle.dump(results[key], open(fname, 'wb'))
+                print 'Saving pkl file {}'.format(fname)
 
         return results
 

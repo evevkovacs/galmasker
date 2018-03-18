@@ -1,0 +1,23 @@
+description: 'Config file for masking bad galaxies'
+
+quantities_to_check:
+  - quantities: ['LSST_filters/totalLuminositiesStellar:LSST_g:rest:dustAtlas',
+                 'LSST_filters/totalLuminositiesStellar:LSST_r:rest:dustAtlas',
+                ]
+    label: 'g-r'
+    min: -1.
+    max: 2.
+    derived: 'flux_to_mag'
+    function: 'weighted_sum'
+    weights:  [1.0, -1.0]
+
+  - quantities: ['LSST_filters/totalLuminositiesStellar:LSST_r:rest:dustAtlas',
+                 'LSST_filters/totalLuminositiesStellar:LSST_i:rest:dustAtlas',
+                ]
+    label: 'r-i'
+    min: -1.
+    max: 2.
+    derived: 'flux_to_mag'
+    function: 'weighted_sum'
+    weights:  [1.0, -1.0]
+
