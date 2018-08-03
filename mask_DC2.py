@@ -60,6 +60,18 @@ def mask_cat(catalog, selections={}):
 
         catalog_data = {}
         key = qdict.get('label','_'.join(qdict['quantities']))
+        if qdict.get('group_start_index',[None]) and len(qdict.get('group_start_index'))>1:
+            group_start_index = qdict.get('group_start_index')
+            group_end_index = [group_start_index[g] + group_start_index[g+1] for g in range(len(group_start_index)-1)]
+            group_end_index.append(len(qdict.get('weights'))) #must exist
+            group = 0 #initialize group count
+            print 'Using weighted quantities in {} groups with lengths {}'.format(len(group_start_index),
+                                             ' '.join([str(group_end_index[g]-group_start_index[g]) for g in range(len(group_start_index))]))
+            grouped_data = {}
+            grouped_sum = {} #not needed yet
+            grouped = True
+        else:
+            grouped = False
         #check for quantities and weights
         for n, (q, w) in enumerate(zip_longest(qdict['quantities'], qdict.get('weights',[None]))):
             q_this = catalog[galaxyProperties][q].value
@@ -70,15 +82,31 @@ def mask_cat(catalog, selections={}):
             if w:
                 w_this = catalog[galaxyProperties][w].value if type(w)==str else w 
                 q_this = np.multiply(w_this, q_this)
-            if n==0:
-                catalog_data[key] = q_this
-                wsum_this = w_this if w and type(w)==str else np.zeros(len(q_this))
-            else: 
-                if w and type(w)==str:
-                    wsum_this = np.add(wsum_this, w_this)
-                #implement just sum for now
-                if 'sum' in qdict.get('function',''):
-                    catalog_data[key] += q_this
+            if grouped: #will skip option for weighted sums - not needed yet
+                if n >= group_end_index[group]:
+                    group += 1
+                if n == group_start_index[group]:
+                    grouped_data[str(group)] = q_this
+                else:
+                    grouped_data[str(group)] += q_this
+            else:
+                if n==0:
+                    catalog_data[key] = q_this 
+                    wsum_this = w_this if w and type(w)==str else np.zeros(len(q_this))
+                else: 
+                    if w and type(w)==str:
+                        wsum_this = np.add(wsum_this, w_this)
+                    #implement just sum for now
+                    if 'sum' in qdict.get('function',''):
+                        catalog_data[key] += q_this
+
+        #check for group weighting and post_processing
+        if grouped:
+            if 'quotient' in qdict.get('post_process',None):
+                catalog_data[key] = grouped_data['0']/grouped_data['1']
+                wsum_this = np.zeros(len(catalog_data[key]))
+            else:
+                print 'Warning: no post_processing function for grouped data'
 
         #normalize if needed
         if any(wsum_this):
