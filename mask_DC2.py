@@ -1,3 +1,4 @@
+import os
 import h5py
 import yaml
 import re
@@ -10,7 +11,9 @@ except ImportError:
     from itertools import izip_longest as zip_longest
 from itertools import chain
 
-catfile = '/cosmo/homes/dkorytov/proj/protoDC2/output/ANL_box_v2.1.3_2_mod.hdf5'
+phoenix_file = '/cosmo/homes/dkorytov/proj/protoDC2/output/ANL_box_v2.1.3_2_mod.hdf5'
+lowz_lib = '/gpfs/mira-fs0/projects/DarkUniverse_esp/dkorytov/data/Galacticus/low_z/galaxy_library'
+hiz_lib = '/gpfs/mira-fs0/projects/DarkUniverse_esp/dkorytov/data/Galacticus/high_z/galaxy_library'
 yamlfile = '../yaml/vet_protoDC2.yaml'
 
 #globals
@@ -29,6 +32,11 @@ def flux_to_mag(flux):
 derived_quantities = OrderedDict((
         ('flux_to_mag', flux_to_mag),
     ))
+
+def read_library(timestep, lowz=True):
+    catfile=os.path.join(lowz_lib,'{}_mod.hdf5'.format(timestep))
+    catalog = h5py.File(catfile, 'r')
+    return catalog
 
 def read_selections(yamlfile=yamlfile):
     
@@ -60,7 +68,7 @@ def mask_cat(catalog, selections={}):
 
         catalog_data = {}
         key = qdict.get('label','_'.join(qdict['quantities']))
-        if qdict.get('group_start_index',[None]) and len(qdict.get('group_start_index'))>1:
+        if qdict.get('group_start_index',[]) and len(qdict.get('group_start_index'))>1:
             group_start_index = qdict.get('group_start_index')
             group_end_index = [group_start_index[g] + group_start_index[g+1] for g in range(len(group_start_index)-1)]
             group_end_index.append(len(qdict.get('weights'))) #must exist
@@ -102,7 +110,7 @@ def mask_cat(catalog, selections={}):
 
         #check for group weighting and post_processing
         if grouped:
-            if 'quotient' in qdict.get('post_process',None):
+            if 'quotient' in qdict.get('post_process', None):
                 catalog_data[key] = grouped_data['0']/grouped_data['1']
                 wsum_this = np.zeros(len(catalog_data[key]))
             else:
@@ -117,7 +125,7 @@ def mask_cat(catalog, selections={}):
 
         #compute checks for each quantity group
         for c in value_checks:
-            if qdict.get(c,None):
+            if qdict.get(c, None) is not None: #explicit test needed in case value is 0
                 if c=='min':
                     mask_notok = catalog_data[key] < qdict.get(c)
                 elif c=='max':
