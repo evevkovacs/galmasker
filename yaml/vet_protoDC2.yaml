@@ -1,17 +1,6 @@
 description: 'Config file for masking bad galaxies'
 
 quantities_to_check:
-  - quantities: ['morphology/diskScaleRadiusArcsec',
-                 'morphology/spheroidScaleRadiusArcsec',
-                ]
-    label: 'size'
-    min: 1.e-2
-    max: 20.
-    function: 'weighted_sum' 
-    weights: ['LSST_filters/diskLuminositiesStellar:LSST_r:rest',
-              'LSST_filters/spheroidLuminositiesStellar:LSST_r:rest',
-             ]
-
   - quantities: ['otherLuminosities/totalLuminositiesStellar:B:rest:dustAtlas',
                  'otherLuminosities/totalLuminositiesStellar:B:rest',
                  'otherLuminosities/totalLuminositiesStellar:V:rest:dustAtlas',
