@@ -70,21 +70,21 @@ def _flux_to_mag(lum):
 
 def check_Rv_masking(Rv): 
     mask_good = np.isfinite(Rv)
-    print('...Calculated {} non-finite Rv values (total={})'.format(np.sum(~mask_good), len(Rv)))
+    print('...Calculated {} non-finite--Rv values (total={})'.format(np.sum(~mask_good), len(Rv)))
     mask_zero = np.isclose(Rv, 0.)
-    print('...Found {} zero Rv values'.format(np.sum(mask_zero)))
+    print('...Found {} zero-Rv values'.format(np.sum(mask_zero)))
     mask_ok = mask_good & ~mask_zero
     print('...Accepting {} Rv values'.format(np.sum(mask_ok)))
     return mask_ok
 
-def test_Rv(yaml='Rv'):
+def test_Rv(nfiles=None, yaml='Rv'):
     lib_files = sorted(glob.glob(lowz_lib) + glob.glob(hiz_lib))
 
     yamlfile = os.path.join('yaml',yaml+'.yaml')
     selections = read_selections(yamlfile=yamlfile)
 
     R_v = {}
-    for lib in lib_files:
+    for lib in lib_files[0:nfiles]:
         key = os.path.splitext(os.path.basename(lib))[0]
         print('Checking {}'.format(os.path.basename(lib)))
         catalog = h5py.File(lib, 'r')
@@ -131,4 +131,4 @@ def test_Rv(yaml='Rv'):
 
     return R_v
 
-R_v = test_Rv()
+#R_v = test_Rv(nfiles=1)

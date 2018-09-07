@@ -26,8 +26,9 @@ func_checks = OrderedDict((
 value_checks = ['min', 'max']
 
 def flux_to_mag(flux):
-    mag = -2.5*np.log10(flux)
-    return mag
+    with np.errstate(divide='ignore', invalid='ignore'):
+        mag = -2.5*np.log10(flux)
+        return mag
 
 derived_quantities = OrderedDict((
         ('flux_to_mag', flux_to_mag),
